@@ -427,7 +427,11 @@ type Stats struct {
 	Total     ModelStat   `json:"total"`
 	Models    []ModelStat `json:"models"`
 	// SeriesBuckets 时间序列的桶数（判断数据可回溯范围）。
-	SeriesBuckets int `json:"series_buckets"`
+	//
+	// omitempty 是必须的：不支持时间维度统计的网关根本不返回这个字段，若面板
+	// 补一个 0 再回给前端，页面会显示「可回溯 0 个时间桶」——把「网关没这个能力」
+	// 说成「有这个能力但还没数据」。前端判的是 `!== undefined`，省略即可隐藏该提示。
+	SeriesBuckets int `json:"series_buckets,omitempty"`
 	// Range 时间维度查询结果（仅当请求带了 range/from/to/interval/model 时返回）。
 	Range *RangeResult `json:"range,omitempty"`
 }

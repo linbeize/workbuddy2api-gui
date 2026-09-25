@@ -387,12 +387,40 @@ export interface ModelStat {
   last_seen?: string
 }
 
+/**
+ * 时间序列数据点里的**原始累计**统计（对应网关的 ModelStats）。
+ *
+ * 与 ModelStat 的区别：这里是「和与计数」，没有均值/比率——平均首字延迟、吞吐、
+ * 命中率、扣费都要网关算过才在 derived 里。类型分开是刻意的：之前 stats 写成
+ * ModelStat，TS 便放过了 `p.stats.credit`（运行时并不存在该字段），
+ * 于是「计费（积分）」趋势线静默恒为 0。
+ */
+export interface RawModelStat {
+  model: string
+  requests: number
+  success: number
+  failed: number
+  streaming: number
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  /**
+   * 扣费累计，单位为「毫」（网关侧用整数累计避免浮点误差）。
+   * 展示一律用 derived.credit —— 本字段只用来解释「为什么不能从 stats 取扣费」。
+   * 可选是因为部分网关实现（stats 直接下发派生量）不带它，面板不读。
+   */
+  credit_milli?: number
+  last_seen?: string
+}
+
 /** 时间序列上的一个数据点。 */
 export interface RangePoint {
   key: string
   start: string
   end: string
-  stats: ModelStat
+  /** 原始累计量：计数类指标从这里取。 */
+  stats: RawModelStat
+  /** 派生指标：均值/比率/扣费从这里取。 */
   derived: ModelStat
 }
 

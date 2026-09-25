@@ -420,11 +420,22 @@ export default function StatsPage({ session }: { session: SessionInfo }) {
               </div>
             )}
           </>
-        ) : (
+        ) : loading ? (
           <Empty>
             正在加载趋势数据…
             <div style={{ marginTop: 6, fontSize: 12 }}>
               时间趋势从启用统计后开始累积（网关重启不清零，但重新部署前的历史不可回溯）。
+            </div>
+          </Empty>
+        ) : (
+          // 加载已完成却仍没有 range：不是「还在加载」，是网关没这个能力。
+          // 两者混用同一句「正在加载」会让人以为卡死——永久的加载态看起来就是故障。
+          <Empty>
+            当前网关不支持「时间维度统计」
+            <div style={{ marginTop: 6, fontSize: 12 }}>
+              /v1/stats 未返回时间序列（range）字段，面板无法绘制趋势图。
+              其余统计（累计值、官方价换算）不受影响。升级网关到含「时间维度统计」的版本后，
+              此图会自动出现，无需改动面板配置。
             </div>
           </Empty>
         )}

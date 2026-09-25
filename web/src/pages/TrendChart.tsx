@@ -39,8 +39,12 @@ function valueOf(p: RangePoint, m: TrendMetric): number {
     case 'cache_hit_rate':
       return (d?.cache_hit_rate ?? 0) * 100
     case 'credit':
-      return p.stats?.credit ?? 0
+      // credit 是**派生量**：网关把累计的 credit_milli/1000 算好后放在 derived 里，
+      // 原始累加结构（stats）里只有 credit_milli，没有 credit。之前从 stats 取，
+      // 恒为 undefined，这条「计费（积分）」趋势线永远是 0。
+      return d?.credit ?? 0
     default:
+      // 计数类指标（requests / *_tokens）才取原始累计值。
       return p.stats?.[m] ?? 0
   }
 }
