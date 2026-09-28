@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -197,6 +198,14 @@ func (t *Table) ModelsCopy() map[string]ModelPrice {
 
 // Resolve 查找模型单价。先精确匹配，再做别名归一化匹配
 // （网关的模型名可能是别名，如 deepseek-v4.1-flash ↔ deepseek-flash）。
+//
+// 调用方传入的模型名可能带网关的 realm 路由前缀（`cn:` / `global:`）——那是网关侧
+// 协议，上游与定价表都不用。不剥前缀就永远命中不了价格表：
+//
+//	normalize("cn:deepseek-v4-flash") = "cn:deepseekv4flash"
+//	normalize("deepseek-v4-flash")    = "deepseekv4flash"   ← 不等
+//
+// 于是统计页所有模型都算作未定价，官方应付金额恒为 0。
 func (t *Table) Resolve(model string) (ModelPrice, bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -204,13 +213,22 @@ func (t *Table) Resolve(model string) (ModelPrice, bool) {
 		return p, true
 	}
 	// 归一化后比较：统一小写、去分隔符（. - _），便于 deepseek-v4.1-flash 命中 deepseek-v4.1.flash 之类的差异。
-	norm := normalize(model)
+	norm := normalize(stripRealmPrefix(model))
 	for name, p := range t.Models {
-		if normalize(name) == norm && p.Priced() {
+		if normalize(stripRealmPrefix(name)) == norm && p.Priced() {
 			return p, true
 		}
 	}
 	return ModelPrice{}, false
+}
+
+// realmPrefixRe 匹配网关的 realm 路由前缀：`cn:` / `global:`（大小写不敏感）。
+// 以冒号为判据——模型 id 本身不含冒号（如 deepseek-v4-flash）。
+var realmPrefixRe = regexp.MustCompile(`(?i)^(cn|global):`)
+
+// stripRealmPrefix 去掉 realm 路由前缀，使价格表只需维护裸模型名。无前缀时原样返回。
+func stripRealmPrefix(model string) string {
+	return realmPrefixRe.ReplaceAllString(strings.TrimSpace(model), "")
 }
 
 // normalize 归一化模型名用于宽松匹配。
